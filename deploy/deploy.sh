@@ -63,7 +63,7 @@ if [[ "$SKIP_BACKEND" != "1" ]]; then
 fi
 
 if [[ "$SKIP_FRONTEND" != "1" ]]; then
-  log "Frontend: npm ci + production build"
+  log "Frontend: npm install + production build"
   cd "$APP_DIR/frontend"
 
   # Empty VITE_API_URL => browser calls same-origin /api and /sanctum
@@ -77,7 +77,12 @@ if [[ "$SKIP_FRONTEND" != "1" ]]; then
   fi
   export VITE_API_URL="${VITE_API_URL:-}"
 
-  npm ci
+  # Prefer clean install; fall back if lockfile is slightly out of sync across npm versions/platforms
+  if ! npm ci; then
+    log "npm ci failed — falling back to npm install"
+    rm -rf node_modules
+    npm install
+  fi
   npm run build
 
   if [[ ! -f dist/index.html ]]; then

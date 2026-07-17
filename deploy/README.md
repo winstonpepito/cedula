@@ -51,6 +51,14 @@ cd /var/www/ecedula/frontend
 cp .env.production.example .env.production
 ```
 
+If a manual frontend build is needed:
+
+```bash
+cd /var/www/ecedula/frontend
+npm ci || npm install
+npm run build
+```
+
 7. Deploy:
 
 ```bash
@@ -58,12 +66,14 @@ cd /var/www/ecedula
 bash deploy/deploy.sh
 ```
 
-8. HTTPS:
+8. HTTPS (Amazon Linux):
 
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
+sudo dnf install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d ecedula.com -d www.ecedula.com
 ```
+
+On Ubuntu, use `apt` instead of `dnf`.
 
 9. Change seeded admin password after login (`admin@ecedula.local` / `password`).
 
