@@ -105,5 +105,25 @@ Editable under **Admin → Tax settings**.
 cedula/
   backend/     Laravel API
   frontend/    React SPA
+  deploy/      Nginx config + EC2 deploy scripts
   docker-compose.yml
 ```
+
+## Production (EC2 + ecedula.com)
+
+See **[deploy/README.md](deploy/README.md)** for full steps.
+
+Quick path on Ubuntu EC2:
+
+```bash
+# after DNS A records point to the server
+bash deploy/server-setup.sh
+cd /var/www/ecedula/backend
+cp .env.production.example .env   # edit DB + secrets
+php artisan key:generate
+cd /var/www/ecedula && bash deploy/deploy.sh
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d ecedula.com -d www.ecedula.com
+```
+
+Later updates: `bash deploy/deploy.sh`
