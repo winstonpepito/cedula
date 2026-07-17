@@ -1,0 +1,24 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ecedula-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ecedula
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_USER: ecedula
+      MYSQL_PASSWORD: secret
+    ports:
+      - "3306:3306"
+    volumes:
+      - ecedula_mysql_data:/var/lib/mysql
+
+  mailhog:
+    image: mailhog/mailhog
+    container_name: ecedula-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  ecedula_mysql_data:

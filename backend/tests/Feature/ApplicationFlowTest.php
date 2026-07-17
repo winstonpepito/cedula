@@ -1,0 +1,160 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Application;
+use App\Models\Barangay;
+use App\Models\BarangayDeliveryFee;
+use App\Models\TaxSetting;
+use App\Models\User;
+use App\Services\ApplicationService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class ApplicationFlowTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Barangay $barangay;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        TaxSetting::create([
+            'individual_base_tax' => 5,
+            'individual_rate_amount' => 1,
+            'individual_rate_per' => 1000,
+            'individual_additional_cap' => 5000,
+            'corporation_base_tax' => 500,
+            'corporation_rate_amount' => 1,
+            'corporation_rate_per' => 5000,
+            'corporation_additional_cap' => 10000,
+            'interest_rate_percent' => 2,
+            'deadline_month' => 2,
+            'deadline_day' => 28,
+            'interest_counts_from_january' => true,
+            'convenience_fee' => 0,
+            'server_fee' => 0,
+            'payment_processor_fee' => 0,
+        ]);
+
+        $this->barangay = Barangay::create(['name' => 'Poblacion', 'code' => 'POB', 'is_active' => true]);
+        BarangayDeliveryFee::create(['barangay_id' => $this->barangay->id, 'fee' => 50, 'is_active' => true]);
+    }
+
+    public function test_create_application_mock_pay_and_documents(): void
+    {
+        $response = $this->postJson('/api/applications', [
+            'applicant_type' => 'individual',
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+            'email' => 'juan@example.com',
+            'address_line' => '123 Main St',
+            'barangay_id' => $this->barangay->id,
+            'delivery_mode' => 'soft_copy',
+            'monthly_salary' => 20000,
+            'thirteenth_month' => 20000,
+            'other_bonuses' => 50000,
+        ]);
+
+        $response->assertCreated();
+        $tracking = $response->json('data.tracking_number');
+
+        $pay = $this->postJson("/api/applications/{$tracking}/pay");
+        $pay->assertOk();
+        $this->assertTrue($pay->json('data.mock'));
+
+        $mock = $this->postJson("/api/applications/{$tracking}/mock-pay");
+        $mock->assertOk();
+        $this->assertTrue($mock->json('data.is_paid'));
+        $this->assertTrue($mock->json('data.can_download_soft_copy'));
+        $this->assertNotEmpty($mock->json('data.documents'));
+
+        $application = Application::where('tracking_number', $tracking)->firstOrFail();
+        $this->assertDatabaseHas('documents', [
+            'application_id' => $application->id,
+            'type' => 'receipt',
+        ]);
+        $this->assertDatabaseHas('documents', [
+            'application_id' => $application->id,
+            'type' => 'soft_copy_cedula',
+        ]);
+    }
+
+    public function test_payment_proof_admin_verify(): void
+    {
+        Storage::fake('local');
+
+        $create = $this->postJson('/api/applications', [
+            'applicant_type' => 'individual',
+            'first_name' => 'Ana',
+            'last_name' => 'Santos',
+            'email' => 'ana@example.com',
+            'address_line' => '45 Mabini',
+            'barangay_id' => $this->barangay->id,
+            'delivery_mode' => 'pickup',
+            'monthly_salary' => 15000,
+            'thirteenth_month' => 0,
+            'other_bonuses' => 0,
+        ])->assertCreated();
+
+        $tracking = $create->json('data.tracking_number');
+
+        $this->post("/api/applications/{$tracking}/payment-proof", [
+            'proof' => UploadedFile::fake()->image('gcash.png'),
+            'notes' => 'Paid via GCash',
+        ])->assertOk();
+
+        $application = Application::where('tracking_number', $tracking)->firstOrFail();
+        $this->assertEquals(Application::STATUS_PENDING_VERIFICATION, $application->status);
+
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->postJson("/api/admin/applications/{$application->id}/verify-payment", [
+                'approve' => true,
+            ])
+            ->assertOk();
+
+        $application->refresh();
+        $this->assertTrue($application->isPaid());
+    }
+
+    public function test_delivery_status_update_by_delivery_role(): void
+    {
+        $application = app(ApplicationService::class)->create([
+            'applicant_type' => 'individual',
+            'first_name' => 'Rico',
+            'last_name' => 'Reyes',
+            'email' => 'rico@example.com',
+            'address_line' => '9 Luna St',
+            'barangay_id' => $this->barangay->id,
+            'delivery_mode' => 'delivery',
+            'monthly_salary' => 10000,
+            'thirteenth_month' => 0,
+            'other_bonuses' => 0,
+        ]);
+
+        $payment = $application->payments()->first();
+        app(ApplicationService::class)->markPaid($application, $payment, 'mock');
+
+        $rider = User::factory()->create(['role' => 'delivery']);
+
+        $this->actingAs($rider)
+            ->patchJson("/api/admin/applications/{$application->id}/status", [
+                'status' => 'out_for_delivery',
+            ])
+            ->assertOk();
+
+        $this->actingAs($rider)
+            ->patchJson("/api/admin/applications/{$application->id}/status", [
+                'status' => 'delivered',
+                'note' => 'Left with guard',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'delivered');
+    }
+}
