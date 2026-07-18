@@ -1,6 +1,22 @@
+import { isAxiosError } from 'axios'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button, Field, Input, PageTitle, Panel, Select } from '../../components/ui'
 import { api } from '../../lib/api'
+
+function saveErrorMessage(err: unknown): string {
+  if (!isAxiosError(err)) return 'Unable to save homepage content.'
+  const data = err.response?.data as
+    | { message?: string; errors?: Record<string, string[] | string> }
+    | undefined
+  if (data?.errors) {
+    const first = Object.values(data.errors).flat()[0]
+    if (first) return String(first)
+  }
+  if (data?.message) return data.message
+  if (err.response?.status === 413) return 'Image is too large for the server upload limit.'
+  if (err.response?.status === 419) return 'Session expired. Refresh the page and try again.'
+  return 'Unable to save homepage content.'
+}
 
 function resolveImageUrl(url: string | null) {
   if (!url) return null
@@ -53,7 +69,10 @@ export function AdminLandingPage() {
       body.append('remove_image', removeImage ? '1' : '0')
       if (file) body.append('image', file)
 
-      const { data } = await api.post('/admin/landing', body)
+      // Let the browser set multipart boundary — do not force Content-Type.
+      const { data } = await api.post('/admin/landing', body, {
+        headers: { 'Content-Type': undefined },
+      })
       setHeadline(data.data.headline)
       setIntroText(data.data.intro_text)
       setImagePosition(data.data.image_position)
@@ -62,8 +81,8 @@ export function AdminLandingPage() {
       setRemoveImage(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-    } catch {
-      setError('Unable to save homepage content.')
+    } catch (err) {
+      setError(saveErrorMessage(err))
     } finally {
       setBusy(false)
     }

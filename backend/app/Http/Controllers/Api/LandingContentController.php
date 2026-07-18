@@ -37,7 +37,8 @@ class LandingContentController extends Controller
                 LandingContent::POSITION_BEFORE,
                 LandingContent::POSITION_AFTER,
             ])],
-            'image' => ['nullable', 'image', 'max:5120'],
+            // Prefer mimes over "image" — works even when php-gd is not installed.
+            'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,gif', 'max:5120'],
             'remove_image' => ['nullable', 'boolean'],
         ]);
 
@@ -49,10 +50,40 @@ class LandingContentController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            if ($content->image_path) {
-                Storage::disk('public')->delete($content->image_path);
+            $file = $request->file('image');
+            if (! $file || ! $file->isValid()) {
+                return response()->json([
+                    'message' => 'The image failed to upload. Check PHP upload_max_filesize / post_max_size.',
+                    'errors' => ['image' => ['Invalid or incomplete upload.']],
+                ], 422);
             }
-            $content->image_path = $request->file('image')->store('landing', 'public');
+
+            $disk = Storage::disk('public');
+            $disk->makeDirectory('landing');
+
+            if ($content->image_path) {
+                $disk->delete($content->image_path);
+            }
+
+            try {
+                $path = $file->store('landing', 'public');
+            } catch (\Throwable $e) {
+                report($e);
+
+                return response()->json([
+                    'message' => 'Could not store the image. Check storage/app/public permissions for the web server user.',
+                    'errors' => ['image' => ['Storage write failed.']],
+                ], 500);
+            }
+
+            if (! $path) {
+                return response()->json([
+                    'message' => 'Could not store the image. Check storage/app/public permissions.',
+                    'errors' => ['image' => ['Storage write failed.']],
+                ], 500);
+            }
+
+            $content->image_path = $path;
         }
 
         $content->headline = $data['headline'];

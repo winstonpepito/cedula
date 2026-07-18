@@ -75,7 +75,8 @@ export function PayPage() {
       body.append('proof', file)
       if (notes) body.append('notes', notes)
       const { data } = await api.post(`/applications/${tracking}/payment-proof`, body, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        // Let the browser set multipart boundary — a bare multipart/form-data header breaks uploads.
+        headers: { 'Content-Type': undefined },
       })
       setApp(data.data)
       setMessage('Payment proof uploaded. An admin will verify it shortly.')

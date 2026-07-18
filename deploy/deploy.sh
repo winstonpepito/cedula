@@ -91,6 +91,7 @@ if [[ "$SKIP_BACKEND" != "1" ]]; then
   log "Backend: permissions"
   # Deploy user owns files; web user is group so PHP-FPM can write without
   # locking the deploy user out of the next git pull.
+  mkdir -p storage/app/public/landing storage/app/public/payment-proofs
   sudo chown -R "$DEPLOY_USER:$WEB_USER" storage bootstrap/cache
   sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \;
   sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
