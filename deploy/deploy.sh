@@ -126,13 +126,16 @@ if [[ "$SKIP_FRONTEND" != "1" ]]; then
 fi
 
 log "Reload PHP-FPM + Nginx"
+# Amazon Linux: php-fpm.service | Ubuntu: php8.2-fpm.service | Remi: php82-php-fpm.service
 PHP_FPM_SERVICE=""
 for candidate in \
-  "php${PHP_VERSION}-fpm" \
   "php-fpm" \
+  "php${PHP_VERSION}-fpm" \
   "php${PHP_VERSION//./}-php-fpm"
 do
-  if systemctl cat "${candidate}.service" &>/dev/null; then
+  if systemctl list-unit-files "${candidate}.service" --no-legend 2>/dev/null \
+    | awk '{print $1}' | grep -qx "${candidate}.service"
+  then
     PHP_FPM_SERVICE="$candidate"
     break
   fi
@@ -141,12 +144,14 @@ if [[ -z "$PHP_FPM_SERVICE" ]]; then
   PHP_FPM_SERVICE="$(
     systemctl list-unit-files --type=service --no-legend 2>/dev/null \
       | awk '{print $1}' \
-      | grep -E '^php([0-9.]+-)?(php-)?fpm\.service$' \
+      | grep -E 'fpm\.service$' \
+      | grep -i php \
       | head -1 \
       | sed 's/\.service$//' || true
   )"
 fi
 if [[ -n "$PHP_FPM_SERVICE" ]]; then
+  log "Reloading ${PHP_FPM_SERVICE}"
   sudo systemctl reload "$PHP_FPM_SERVICE" || sudo systemctl restart "$PHP_FPM_SERVICE"
 else
   echo "WARN: could not find php-fpm service to reload"
