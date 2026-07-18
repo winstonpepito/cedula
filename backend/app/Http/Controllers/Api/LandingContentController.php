@@ -65,20 +65,36 @@ class LandingContentController extends Controller
                 $disk->delete($content->image_path);
             }
 
+            $publicRoot = storage_path('app/public');
+            if (! is_dir($publicRoot) && ! @mkdir($publicRoot, 0775, true) && ! is_dir($publicRoot)) {
+                return response()->json([
+                    'message' => "Storage directory missing and not creatable: {$publicRoot}",
+                    'errors' => ['image' => ['Storage write failed.']],
+                ], 500);
+            }
+            if (! is_writable($publicRoot)) {
+                $who = function_exists('posix_geteuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? 'unknown') : 'unknown';
+
+                return response()->json([
+                    'message' => "PHP user [{$who}] cannot write {$publicRoot}. On Amazon Linux, chown the group to the php-fpm user (often apache).",
+                    'errors' => ['image' => ['Storage write failed.']],
+                ], 500);
+            }
+
             try {
                 $path = $file->store('landing', 'public');
             } catch (\Throwable $e) {
                 report($e);
 
                 return response()->json([
-                    'message' => 'Could not store the image. Check storage/app/public permissions for the web server user.',
+                    'message' => 'Could not store the image: '.$e->getMessage(),
                     'errors' => ['image' => ['Storage write failed.']],
                 ], 500);
             }
 
             if (! $path) {
                 return response()->json([
-                    'message' => 'Could not store the image. Check storage/app/public permissions.',
+                    'message' => "Could not store the image under {$publicRoot}/landing.",
                     'errors' => ['image' => ['Storage write failed.']],
                 ], 500);
             }

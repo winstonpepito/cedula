@@ -19,7 +19,26 @@ SKIP_BACKEND="${SKIP_BACKEND:-0}"
 DEPLOY_USER="$(id -un)"
 DEPLOY_GROUP="$(id -gn)"
 
-# Auto-detect web server user (Amazon Linux => nginx, Ubuntu => www-data)
+# Auto-detect Nginx user (for static files) and PHP-FPM pool user (for uploads).
+# Amazon Linux often runs Nginx as nginx but PHP-FPM as apache — mismatch breaks storage writes.
+detect_php_fpm_user() {
+  local conf user
+  for conf in \
+    /etc/php-fpm.d/www.conf \
+    /etc/php/*/fpm/pool.d/www.conf \
+    /etc/php-fpm.conf
+  do
+    if [[ -f "$conf" ]]; then
+      user="$(sudo grep -E '^\s*user\s*=' "$conf" | head -1 | awk -F= '{print $2}' | tr -d '[:space:]' || true)"
+      if [[ -n "$user" ]]; then
+        echo "$user"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
 if [[ -z "${WEB_USER:-}" ]]; then
   if id nginx &>/dev/null; then
     WEB_USER=nginx
@@ -27,6 +46,17 @@ if [[ -z "${WEB_USER:-}" ]]; then
     WEB_USER=www-data
   else
     WEB_USER=www-data
+  fi
+fi
+
+if [[ -z "${PHP_USER:-}" ]]; then
+  PHP_USER="$(detect_php_fpm_user || true)"
+  if [[ -z "$PHP_USER" ]]; then
+    if id apache &>/dev/null; then
+      PHP_USER=apache
+    else
+      PHP_USER="$WEB_USER"
+    fi
   fi
 fi
 
@@ -41,7 +71,7 @@ cd "$APP_DIR"
 
 # storage/bootstrap/cache were often chowned to the web user; git then cannot
 # update tracked .gitignore files inside them. Hand the tree back to the deploy user first.
-log "Fixing ownership for git update (as $DEPLOY_USER, web user=$WEB_USER)"
+log "Fixing ownership for git update (as $DEPLOY_USER; nginx=$WEB_USER php-fpm=$PHP_USER)"
 sudo chown -R "$DEPLOY_USER:$DEPLOY_GROUP" \
   "$APP_DIR/backend/bootstrap/cache" \
   "$APP_DIR/backend/storage" \
@@ -88,13 +118,27 @@ if [[ "$SKIP_BACKEND" != "1" ]]; then
   php artisan route:cache
   php artisan view:cache
 
-  log "Backend: permissions"
-  # Deploy user owns files; web user is group so PHP-FPM can write without
-  # locking the deploy user out of the next git pull.
-  mkdir -p storage/app/public/landing storage/app/public/payment-proofs
-  sudo chown -R "$DEPLOY_USER:$WEB_USER" storage bootstrap/cache
+  log "Backend: permissions (owner=$DEPLOY_USER group=$PHP_USER for PHP-FPM writes)"
+  # Deploy user owns files; PHP-FPM pool user is the group so uploads work.
+  # On Amazon Linux this is often "apache", not "nginx".
+  mkdir -p storage/app/public/landing storage/app/private storage/framework/{cache,sessions,views} storage/logs
+  sudo chown -R "$DEPLOY_USER:$PHP_USER" storage bootstrap/cache
   sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \;
   sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
+  # ACL so both nginx (serving /storage) and php-fpm can read/write if they differ
+  if command -v setfacl >/dev/null 2>&1; then
+    sudo setfacl -R -m "u:${PHP_USER}:rwx" -m "d:u:${PHP_USER}:rwx" storage bootstrap/cache || true
+    if [[ "$WEB_USER" != "$PHP_USER" ]]; then
+      sudo setfacl -R -m "u:${WEB_USER}:rx" -m "d:u:${WEB_USER}:rx" storage/app/public || true
+    fi
+  fi
+  # Quick write probe as the PHP-FPM user
+  if sudo -u "$PHP_USER" test -w storage/app/public; then
+    log "PHP-FPM user $PHP_USER can write storage/app/public"
+  else
+    echo "WARN: $PHP_USER still cannot write storage/app/public — uploads will fail"
+    ls -la storage/app/public || true
+  fi
 fi
 
 if [[ "$SKIP_FRONTEND" != "1" ]]; then
