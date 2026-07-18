@@ -92,17 +92,34 @@ SKIP_FRONTEND=1 bash deploy/deploy.sh
 PHP_VERSION=8.3 bash deploy/deploy.sh
 ```
 
-## PHP socket note
+## PHP socket note (Amazon Linux vs Ubuntu)
 
-If PHP-FPM is not `php8.2-fpm`, edit `deploy/nginx/ecedula.conf` and change:
-
-```text
-unix:/run/php/php8.2-fpm.sock
-```
-
-to your socket (e.g. `php8.3-fpm.sock`), then:
+If `/api` or login returns **502 Bad Gateway**, Nginx is pointing at the wrong PHP-FPM socket.
 
 ```bash
-sudo cp deploy/nginx/ecedula.conf /etc/nginx/sites-available/ecedula
-sudo nginx -t && sudo systemctl reload nginx
+# Find the live socket
+ls -la /run/php-fpm/*.sock /run/php/*.sock 2>/dev/null
+
+# Amazon Linux usual path:
+#   /run/php-fpm/www.sock
+# Ubuntu usual path:
+#   /run/php/php8.2-fpm.sock
+
+# Install / refresh site config (Amazon Linux uses conf.d)
+sudo cp /var/www/ecedula/deploy/nginx/ecedula.conf /etc/nginx/conf.d/ecedula.conf
+# Then patch to the socket you found, if different:
+sudo sed -i 's|unix:/run/php-fpm/www.sock|unix:/run/php-fpm/www.sock|g' /etc/nginx/conf.d/ecedula.conf
+sudo nginx -t && sudo systemctl reload nginx php-fpm
+
+# Confirm API works
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1/api/barangays
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1/up
+```
+
+`deploy/deploy.sh` auto-patches `fastcgi_pass` when it finds a `.sock` file.
+
+Also seed staff users if login still fails after API is healthy:
+
+```bash
+cd /var/www/ecedula/backend && php artisan db:seed
 ```

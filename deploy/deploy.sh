@@ -125,6 +125,46 @@ if [[ "$SKIP_FRONTEND" != "1" ]]; then
   fi
 fi
 
+log "Ensure Nginx PHP-FPM socket matches this host"
+PHP_SOCK=""
+for candidate in \
+  "/run/php-fpm/www.sock" \
+  "/run/php/php${PHP_VERSION}-fpm.sock" \
+  "/run/php/php-fpm.sock" \
+  "/var/run/php-fpm/www.sock" \
+  "/var/run/php/php${PHP_VERSION}-fpm.sock"
+do
+  if [[ -S "$candidate" ]]; then
+    PHP_SOCK="$candidate"
+    break
+  fi
+done
+if [[ -z "$PHP_SOCK" ]]; then
+  PHP_SOCK="$(
+    sudo find /run /var/run -name '*.sock' 2>/dev/null \
+      | grep -E 'php|fpm' \
+      | head -1 || true
+  )"
+fi
+NGINX_SITE=""
+for conf in \
+  /etc/nginx/conf.d/ecedula.conf \
+  /etc/nginx/sites-enabled/ecedula \
+  /etc/nginx/sites-available/ecedula
+do
+  if [[ -f "$conf" ]]; then
+    NGINX_SITE="$conf"
+    break
+  fi
+done
+if [[ -n "$PHP_SOCK" && -n "$NGINX_SITE" ]]; then
+  log "Patching $NGINX_SITE → fastcgi_pass unix:${PHP_SOCK}"
+  sudo sed -i -E "s|fastcgi_pass unix:[^;]+;|fastcgi_pass unix:${PHP_SOCK};|g" "$NGINX_SITE"
+elif [[ -z "$PHP_SOCK" ]]; then
+  echo "WARN: no PHP-FPM socket found — API will 502 until Nginx fastcgi_pass is fixed"
+  echo "      ls -la /run/php-fpm/*.sock /run/php/*.sock"
+fi
+
 log "Reload PHP-FPM + Nginx"
 # Amazon Linux: php-fpm.service | Ubuntu: php8.2-fpm.service | Remi: php82-php-fpm.service
 PHP_FPM_SERVICE=""
