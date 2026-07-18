@@ -126,12 +126,31 @@ if [[ "$SKIP_FRONTEND" != "1" ]]; then
 fi
 
 log "Reload PHP-FPM + Nginx"
-if systemctl list-units --type=service --all | grep -q "php${PHP_VERSION}-fpm"; then
-  sudo systemctl reload "php${PHP_VERSION}-fpm"
-elif systemctl list-units --type=service --all | grep -q "php-fpm"; then
-  sudo systemctl reload php-fpm
+PHP_FPM_SERVICE=""
+for candidate in \
+  "php${PHP_VERSION}-fpm" \
+  "php-fpm" \
+  "php${PHP_VERSION//./}-php-fpm"
+do
+  if systemctl cat "${candidate}.service" &>/dev/null; then
+    PHP_FPM_SERVICE="$candidate"
+    break
+  fi
+done
+if [[ -z "$PHP_FPM_SERVICE" ]]; then
+  PHP_FPM_SERVICE="$(
+    systemctl list-unit-files --type=service --no-legend 2>/dev/null \
+      | awk '{print $1}' \
+      | grep -E '^php([0-9.]+-)?(php-)?fpm\.service$' \
+      | head -1 \
+      | sed 's/\.service$//' || true
+  )"
+fi
+if [[ -n "$PHP_FPM_SERVICE" ]]; then
+  sudo systemctl reload "$PHP_FPM_SERVICE" || sudo systemctl restart "$PHP_FPM_SERVICE"
 else
   echo "WARN: could not find php-fpm service to reload"
+  echo "      Run: systemctl list-unit-files | grep -i fpm"
 fi
 
 sudo nginx -t
