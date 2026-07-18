@@ -42,17 +42,23 @@ export function ApplyPage() {
 
   useEffect(() => {
     void Promise.all([
-      api.get('/barangays').then((res) => setBarangays(res.data.data)),
-      api.get('/settings').then((res) => {
-        const city = res.data.data.default_city || 'Cebu City'
-        const province = res.data.data.default_province || 'Cebu'
-        setForm((prev) => ({
-          ...prev,
-          city: prev.city || city,
-          province: prev.province || province,
-        }))
-      }),
-    ])
+      api.get('/barangays').then((res) => res.data.data as Barangay[]),
+      api.get('/settings').then((res) => res.data.data),
+    ]).then(([list, settings]) => {
+      setBarangays(list)
+      setForm((prev) => {
+        const city = prev.city || settings.default_city || 'Cebu City'
+        const province = prev.province || settings.default_province || 'Cebu'
+        let barangay_id = prev.barangay_id
+        if (!barangay_id && settings.default_barangay_id != null) {
+          const exists = list.some((b) => b.id === settings.default_barangay_id)
+          if (exists) {
+            barangay_id = String(settings.default_barangay_id)
+          }
+        }
+        return { ...prev, city, province, barangay_id }
+      })
+    })
   }, [])
 
   const selectedBarangay = useMemo(

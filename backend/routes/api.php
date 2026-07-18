@@ -46,6 +46,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/barangays', [BarangayController::class, 'index'])->middleware('staff:admin');
         Route::post('/barangays', [BarangayController::class, 'store'])->middleware('staff:admin');
+        Route::get('/barangays/default', [BarangayController::class, 'showDefault'])->middleware('staff:admin');
+        Route::put('/barangays/default', [BarangayController::class, 'updateDefault'])->middleware('staff:admin');
         Route::put('/barangays/{barangay}', [BarangayController::class, 'update'])->middleware('staff:admin');
         Route::delete('/barangays/{barangay}', [BarangayController::class, 'destroy'])->middleware('staff:admin');
 

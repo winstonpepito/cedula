@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Button, Field, Input, PageTitle, Panel } from '../../components/ui'
+import { Button, Field, Input, PageTitle, Panel, Select } from '../../components/ui'
 import { api, formatPeso } from '../../lib/api'
 import type { Barangay } from '../../types'
 
@@ -8,10 +8,19 @@ export function AdminBarangays() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [fee, setFee] = useState('50')
+  const [defaultBarangayId, setDefaultBarangayId] = useState('')
+  const [defaultBusy, setDefaultBusy] = useState(false)
+  const [defaultSaved, setDefaultSaved] = useState(false)
+  const [defaultError, setDefaultError] = useState('')
 
   async function load() {
-    const { data } = await api.get('/admin/barangays')
-    setRows(data.data)
+    const [barangaysRes, defaultRes] = await Promise.all([
+      api.get('/admin/barangays'),
+      api.get('/admin/barangays/default'),
+    ])
+    setRows(barangaysRes.data.data)
+    const id = defaultRes.data.data.default_barangay_id
+    setDefaultBarangayId(id != null ? String(id) : '')
   }
 
   useEffect(() => {
@@ -44,9 +53,57 @@ export function AdminBarangays() {
     await load()
   }
 
+  async function saveDefault(e: FormEvent) {
+    e.preventDefault()
+    setDefaultBusy(true)
+    setDefaultError('')
+    setDefaultSaved(false)
+    try {
+      const { data } = await api.put('/admin/barangays/default', {
+        default_barangay_id: defaultBarangayId ? Number(defaultBarangayId) : null,
+      })
+      const id = data.data.default_barangay_id
+      setDefaultBarangayId(id != null ? String(id) : '')
+      setDefaultSaved(true)
+      setTimeout(() => setDefaultSaved(false), 2000)
+    } catch {
+      setDefaultError('Unable to save default barangay.')
+    } finally {
+      setDefaultBusy(false)
+    }
+  }
+
   return (
     <div>
       <PageTitle title="Barangays & delivery fees" subtitle="Delivery charges are looked up from the applicant barangay." />
+
+      <Panel className="mb-6">
+        <form className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end" onSubmit={(e) => void saveDefault(e)}>
+          <Field
+            label="Default barangay for applications"
+            hint="Pre-selected on the apply form address step. Applicants can still change it."
+          >
+            <Select
+              value={defaultBarangayId}
+              onChange={(e) => setDefaultBarangayId(e.target.value)}
+            >
+              <option value="">No default — applicant must choose</option>
+              {rows.map((row) => (
+                <option key={row.id} value={row.id} disabled={!row.is_active}>
+                  {row.name}{row.is_active ? '' : ' (inactive)'}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={defaultBusy}>
+              {defaultBusy ? 'Saving…' : 'Save default'}
+            </Button>
+            {defaultSaved ? <span className="text-sm text-teal-deep">Saved.</span> : null}
+          </div>
+          {defaultError ? <p className="text-sm text-accent md:col-span-2">{defaultError}</p> : null}
+        </form>
+      </Panel>
 
       <Panel className="mb-6">
         <form className="grid gap-3 md:grid-cols-4" onSubmit={(e) => void create(e)}>
@@ -66,6 +123,7 @@ export function AdminBarangays() {
                 <th className="py-2 pr-4">Code</th>
                 <th className="py-2 pr-4">Fee</th>
                 <th className="py-2 pr-4">Active</th>
+                <th className="py-2 pr-4">Default</th>
                 <th className="py-2 text-right">Actions</th>
               </tr>
             </thead>
@@ -84,6 +142,13 @@ export function AdminBarangays() {
                     <div className="text-xs text-ink/45">{formatPeso(row.deliveryFee?.fee ?? 0)}</div>
                   </td>
                   <td className="py-3 pr-4">{row.is_active ? 'Yes' : 'No'}</td>
+                  <td className="py-3 pr-4">
+                    {String(row.id) === defaultBarangayId ? (
+                      <span className="rounded-md bg-teal-soft px-2 py-0.5 text-xs font-semibold text-teal-deep">Default</span>
+                    ) : (
+                      <span className="text-ink/35">—</span>
+                    )}
+                  </td>
                   <td className="py-3 text-right">
                     <button
                       type="button"

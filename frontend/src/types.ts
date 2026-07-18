@@ -104,6 +104,7 @@ export interface TaxSettings {
   payment_processor_fee: number | string
   default_city: string
   default_province: string
+  default_barangay_id?: number | null
   manual_payment_only: boolean
   gcash_number?: string | null
 }
@@ -111,6 +112,7 @@ export interface TaxSettings {
 export interface PublicSettings {
   default_city: string
   default_province: string
+  default_barangay_id?: number | null
   manual_payment_only: boolean
   gcash_number?: string | null
 }

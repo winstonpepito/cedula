@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Barangay;
 use App\Models\BarangayDeliveryFee;
+use App\Models\TaxSetting;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class BarangayController extends Controller
 {
@@ -88,5 +90,37 @@ class BarangayController extends Controller
         $barangay->delete();
 
         return response()->json(['message' => 'Deleted']);
+    }
+
+    public function showDefault()
+    {
+        $settings = TaxSetting::current();
+
+        return response()->json([
+            'data' => [
+                'default_barangay_id' => $settings->default_barangay_id,
+            ],
+        ]);
+    }
+
+    public function updateDefault(Request $request)
+    {
+        $data = $request->validate([
+            'default_barangay_id' => [
+                'nullable',
+                Rule::exists('barangays', 'id')->where(fn ($q) => $q->where('is_active', true)),
+            ],
+        ]);
+
+        $settings = TaxSetting::current();
+        $settings->update([
+            'default_barangay_id' => $data['default_barangay_id'] ?? null,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'default_barangay_id' => $settings->fresh()->default_barangay_id,
+            ],
+        ]);
     }
 }
