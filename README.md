@@ -62,6 +62,13 @@ Vite proxies `/api` and `/sanctum` to the Laravel server.
 | Admin    | `admin@ecedula.local`   | `password` |
 | Delivery | `delivery@ecedula.local`| `password` |
 
+Seed (users, tax defaults, landing copy, Cebu City barangays + delivery fees):
+
+```bash
+cd backend
+php artisan db:seed
+```
+
 ## PayMongo
 
 Set in `backend/.env`:
