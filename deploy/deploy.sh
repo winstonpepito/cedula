@@ -13,6 +13,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/var/www/ecedula}"
 PHP_VERSION="${PHP_VERSION:-8.2}"
 WEB_USER="${WEB_USER:-www-data}"
+# On Amazon Linux, override: WEB_USER=nginx bash deploy/deploy.sh
 BRANCH="${BRANCH:-main}"
 SKIP_MIGRATE="${SKIP_MIGRATE:-0}"
 SKIP_FRONTEND="${SKIP_FRONTEND:-0}"
@@ -30,7 +31,17 @@ cd "$APP_DIR"
 log "Pulling latest code ($BRANCH)"
 git fetch origin
 git checkout "$BRANCH"
-git pull --ff-only origin "$BRANCH"
+
+# Production servers should match origin. Local edits to tracked files (e.g. package-lock
+# from a prior npm install) must not block deploys. Preserve env files.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  log "Discarding local changes to tracked files (keeping .env*)"
+  git stash push -m "deploy.sh auto-stash $(date -u +%Y%m%dT%H%M%SZ)" -- || true
+fi
+
+git reset --hard "origin/${BRANCH}"
+# Remove untracked build junk, but never delete env files
+git clean -fd -e 'backend/.env' -e 'frontend/.env' -e 'frontend/.env.production' -e 'frontend/dist'
 
 if [[ "$SKIP_BACKEND" != "1" ]]; then
   log "Backend: Composer install"
