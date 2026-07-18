@@ -12,12 +12,23 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/ecedula}"
 PHP_VERSION="${PHP_VERSION:-8.2}"
-WEB_USER="${WEB_USER:-www-data}"
-# On Amazon Linux, override: WEB_USER=nginx bash deploy/deploy.sh
 BRANCH="${BRANCH:-main}"
 SKIP_MIGRATE="${SKIP_MIGRATE:-0}"
 SKIP_FRONTEND="${SKIP_FRONTEND:-0}"
 SKIP_BACKEND="${SKIP_BACKEND:-0}"
+DEPLOY_USER="$(id -un)"
+DEPLOY_GROUP="$(id -gn)"
+
+# Auto-detect web server user (Amazon Linux => nginx, Ubuntu => www-data)
+if [[ -z "${WEB_USER:-}" ]]; then
+  if id nginx &>/dev/null; then
+    WEB_USER=nginx
+  elif id www-data &>/dev/null; then
+    WEB_USER=www-data
+  else
+    WEB_USER=www-data
+  fi
+fi
 
 log() { printf '\n==> %s\n' "$*"; }
 
@@ -27,6 +38,16 @@ if [[ ! -d "$APP_DIR/.git" ]]; then
 fi
 
 cd "$APP_DIR"
+
+# storage/bootstrap/cache were often chowned to the web user; git then cannot
+# update tracked .gitignore files inside them. Hand the tree back to the deploy user first.
+log "Fixing ownership for git update (as $DEPLOY_USER, web user=$WEB_USER)"
+sudo chown -R "$DEPLOY_USER:$DEPLOY_GROUP" \
+  "$APP_DIR/backend/bootstrap/cache" \
+  "$APP_DIR/backend/storage" \
+  "$APP_DIR/.git" 2>/dev/null || true
+# Also reclaim the rest of the checkout if a prior root/sudo left files unwritable
+sudo chown -R "$DEPLOY_USER:$DEPLOY_GROUP" "$APP_DIR"
 
 log "Pulling latest code ($BRANCH)"
 git fetch origin
@@ -68,8 +89,10 @@ if [[ "$SKIP_BACKEND" != "1" ]]; then
   php artisan view:cache
 
   log "Backend: permissions"
-  sudo chown -R "$WEB_USER:$WEB_USER" storage bootstrap/cache
-  sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
+  # Deploy user owns files; web user is group so PHP-FPM can write without
+  # locking the deploy user out of the next git pull.
+  sudo chown -R "$DEPLOY_USER:$WEB_USER" storage bootstrap/cache
+  sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \;
   sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
 fi
 
