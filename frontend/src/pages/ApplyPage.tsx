@@ -270,11 +270,15 @@ export function ApplyPage() {
           {step === 3 && (
             <div className="space-y-4">
               <h2 className="font-display text-2xl font-bold">How do you want to receive it?</h2>
+              <p className="rounded-2xl border border-teal/20 bg-teal-soft/50 px-4 py-3 text-sm leading-relaxed text-ink/75">
+                Claims and deliveries are available on working days only. Applications submitted in the afternoon
+                will be available for claim or delivery the following working day.
+              </p>
               <div className="grid gap-3">
                 {([
                   ['soft_copy', 'Soft copy', 'Digital certificate via download after payment. No delivery fee.'],
-                  ['pickup', 'Pickup', 'Claim the physical document at the office. No delivery fee.'],
-                  ['delivery', 'Delivered', `Doorstep delivery. Fee for ${selectedBarangay?.name || 'selected barangay'}: ${formatPeso(selectedBarangay?.delivery_fee || 0)}`],
+                  ['pickup', 'Pickup', 'Claim the physical document at the office on working days. No delivery fee.'],
+                  ['delivery', 'Delivered', `Doorstep delivery on working days. Fee for ${selectedBarangay?.name || 'selected barangay'}: ${formatPeso(selectedBarangay?.delivery_fee || 0)}`],
                 ] as const).map(([mode, title, desc]) => (
                   <button
                     key={mode}
