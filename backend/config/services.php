@@ -40,6 +40,11 @@ return [
         'public_key' => env('PAYMONGO_PUBLIC_KEY'),
         'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
         'enabled' => filter_var(env('PAYMONGO_ENABLED', false), FILTER_VALIDATE_BOOL),
+        // Comma-separated: qrph,card,gcash,grab_pay — must also be Active in PayMongo Dashboard
+        'payment_methods' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('PAYMONGO_PAYMENT_METHODS', 'qrph,card,gcash'))
+        ))),
     ],
 
 ];

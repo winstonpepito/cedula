@@ -63,7 +63,7 @@ class ApplicationController extends Controller
 
         $data = $request->validate([
             'methods' => ['nullable', 'array'],
-            'methods.*' => ['in:card,gcash'],
+            'methods.*' => ['in:qrph,card,gcash,grab_pay'],
         ]);
 
         $payment = $application->payments()->latest()->first()
@@ -77,7 +77,7 @@ class ApplicationController extends Controller
         $checkout = $payMongo->createCheckoutSession(
             $application,
             $payment,
-            $data['methods'] ?? ['card', 'gcash']
+            $data['methods'] ?? null
         );
 
         $payment->update([

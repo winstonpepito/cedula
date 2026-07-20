@@ -43,7 +43,13 @@ class PayMongoWebhookController extends Controller
                 $payments = $attrs['payments'] ?? [];
                 if (! empty($payments[0]['attributes']['source']['type'])) {
                     $source = $payments[0]['attributes']['source']['type'];
-                    $method = $source === 'gcash' ? 'paymongo_gcash' : 'paymongo_card';
+                    $method = match ($source) {
+                        'gcash' => 'paymongo_gcash',
+                        'qrph' => 'paymongo_qrph',
+                        'grab_pay' => 'paymongo_grab_pay',
+                        'card' => 'paymongo_card',
+                        default => 'paymongo_'.$source,
+                    };
                 }
 
                 $payment->paymongo_payment_id = $payments[0]['id'] ?? $payment->paymongo_payment_id;

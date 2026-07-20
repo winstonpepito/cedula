@@ -49,7 +49,8 @@ export function PayPage() {
     setMessage('')
     try {
       const { data } = await api.post(`/applications/${tracking}/pay`, {
-        methods: ['card', 'gcash'],
+        // Backend defaults include qrph/card/gcash; PayMongo only shows methods Active in the dashboard.
+        methods: ['qrph', 'card', 'gcash'],
       })
       if (data.data.mock) {
         navigate(`/pay/${tracking}/mock`)
@@ -129,10 +130,10 @@ export function PayPage() {
           {!manualOnly ? (
             <div className="mt-6 space-y-3">
               <Button className="w-full" disabled={busy} onClick={() => void payOnline()}>
-                Pay with card or GCash
+                Pay online (QRPh / card / GCash)
               </Button>
               <p className="text-xs text-ink/50">
-                Powered by PayMongo when configured. Local mock checkout is used if keys are not set.
+                Powered by PayMongo. Only payment methods activated in your PayMongo dashboard will appear at checkout.
               </p>
             </div>
           ) : null}

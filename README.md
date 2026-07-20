@@ -78,10 +78,13 @@ PAYMONGO_ENABLED=true
 PAYMONGO_SECRET_KEY=sk_test_...
 PAYMONGO_PUBLIC_KEY=pk_test_...
 PAYMONGO_WEBHOOK_SECRET=whsec_...
+PAYMONGO_PAYMENT_METHODS=qrph,card,gcash
 ```
 
 Webhook URL: `POST /api/webhooks/paymongo`  
 Event: `checkout_session.payment.paid`
+
+Methods in `PAYMONGO_PAYMENT_METHODS` must also be **Active** under PayMongo Dashboard → Payment Methods. If checkout says “No payment methods are available”, the session is requesting inactive channels (e.g. only `card`/`gcash` while only QRPh is active).
 
 When `PAYMONGO_ENABLED=false` or keys are empty, checkout uses a **mock payment page** so you can finish the flow locally.
 

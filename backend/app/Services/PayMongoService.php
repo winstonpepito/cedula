@@ -18,11 +18,15 @@ class PayMongoService
             && filled(config('services.paymongo.secret_key'));
     }
 
-    public function createCheckoutSession(Application $application, Payment $payment, array $paymentMethods = ['card', 'gcash']): array
+    public function createCheckoutSession(Application $application, Payment $payment, ?array $paymentMethods = null): array
     {
         if (! $this->isEnabled()) {
             return $this->createMockCheckout($application, $payment);
         }
+
+        // Only methods listed here AND activated in PayMongo Dashboard will appear.
+        // Default includes qrph (often active first); card/gcash show when activated.
+        $paymentMethods ??= $this->defaultPaymentMethods();
 
         $amountCentavos = (int) round(((float) $payment->amount) * 100);
         $successUrl = rtrim(config('app.frontend_url'), '/').'/receipt/'.$application->tracking_number.'?paid=1';
@@ -81,6 +85,19 @@ class PayMongoService
             'raw' => ['mock' => true],
             'mock' => true,
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function defaultPaymentMethods(): array
+    {
+        $configured = config('services.paymongo.payment_methods');
+        if (is_array($configured) && $configured !== []) {
+            return array_values(array_filter($configured, fn ($m) => is_string($m) && $m !== ''));
+        }
+
+        return ['qrph', 'card', 'gcash'];
     }
 
     public function verifyWebhookSignature(string $payload, ?string $signatureHeader): bool
