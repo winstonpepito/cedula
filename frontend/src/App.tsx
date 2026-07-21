@@ -14,6 +14,7 @@ import { AdminLandingPage } from './pages/admin/AdminLandingPage'
 import { AdminLoginPage } from './pages/admin/AdminLoginPage'
 import { AdminSettings } from './pages/admin/AdminSettings'
 import { AdminShell } from './pages/admin/AdminShell'
+import { AdminUsers } from './pages/admin/AdminUsers'
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="applications" element={<AdminApplications />} />
             <Route path="applications/:id" element={<AdminApplicationDetail />} />
             <Route path="barangays" element={<AdminBarangays />} />
+            <Route path="users" element={<AdminUsers />} />
             <Route path="homepage" element={<AdminLandingPage />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>

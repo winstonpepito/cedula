@@ -185,6 +185,14 @@ class ApplicationFlowTest extends TestCase
         $rider = User::factory()->create(['role' => 'delivery']);
 
         $this->actingAs($rider)
+            ->getJson("/api/admin/applications/{$application->id}")
+            ->assertOk();
+
+        $this->actingAs($rider)
+            ->get("/api/admin/applications/{$application->id}/summary.pdf")
+            ->assertOk();
+
+        $this->actingAs($rider)
             ->patchJson("/api/admin/applications/{$application->id}/status", [
                 'status' => 'out_for_delivery',
             ])
@@ -197,5 +205,61 @@ class ApplicationFlowTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('data.status', 'delivered');
+    }
+
+    public function test_admin_can_manage_delivery_users(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $create = $this->actingAs($admin)
+            ->postJson('/api/admin/users', [
+                'name' => 'Rider One',
+                'email' => 'rider1@example.com',
+                'password' => 'password123',
+                'role' => 'delivery',
+            ])
+            ->assertCreated();
+
+        $userId = $create->json('data.id');
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/users')
+            ->assertOk()
+            ->assertJsonFragment(['email' => 'rider1@example.com']);
+
+        $this->actingAs($admin)
+            ->putJson("/api/admin/users/{$userId}", [
+                'name' => 'Rider Updated',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Rider Updated');
+
+        $this->actingAs($admin)
+            ->deleteJson("/api/admin/users/{$userId}")
+            ->assertOk();
+
+        $this->assertDatabaseMissing('users', ['id' => $userId]);
+    }
+
+    public function test_delivery_cannot_access_non_delivery_application(): void
+    {
+        $application = app(ApplicationService::class)->create([
+            'applicant_type' => 'individual',
+            'first_name' => 'Mia',
+            'last_name' => 'Cruz',
+            'email' => 'mia@example.com',
+            'address_line' => '1 Oak St',
+            'barangay_id' => $this->barangay->id,
+            'delivery_mode' => 'pickup',
+            'monthly_salary' => 10000,
+            'thirteenth_month' => 0,
+            'other_bonuses' => 0,
+        ]);
+
+        $rider = User::factory()->create(['role' => 'delivery']);
+
+        $this->actingAs($rider)
+            ->getJson("/api/admin/applications/{$application->id}")
+            ->assertForbidden();
     }
 }

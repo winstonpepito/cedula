@@ -28,6 +28,7 @@ export function AdminShell() {
               {isAdmin ? (
                 <>
                   <NavLink to="/admin/barangays" className={({ isActive }) => isActive ? 'text-teal' : ''}>Barangays</NavLink>
+                  <NavLink to="/admin/users" className={({ isActive }) => isActive ? 'text-teal' : ''}>Staff users</NavLink>
                   <NavLink to="/admin/homepage" className={({ isActive }) => isActive ? 'text-teal' : ''}>Homepage</NavLink>
                   <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'text-teal' : ''}>Tax settings</NavLink>
                 </>

@@ -17,6 +17,8 @@ interface AdminApp {
   applicant_type: string
   barangay?: { name: string }
   address_line?: string
+  city?: string
+  province?: string
   paid_at?: string | null
   payment_proofs?: Array<{
     id: number
@@ -34,9 +36,11 @@ interface AdminApp {
 }
 
 export function AdminApplications() {
+  const { user } = useAuth()
   const [rows, setRows] = useState<AdminApp[]>([])
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
+  const isDelivery = user?.role === 'delivery'
 
   async function load() {
     const { data } = await api.get('/admin/applications', {
@@ -49,23 +53,34 @@ export function AdminApplications() {
     void load()
   }, [])
 
+  const statusOptions = isDelivery
+    ? ['processing', 'out_for_delivery', 'delivered', 'paid']
+    : [
+        'awaiting_payment',
+        'pending_verification',
+        'paid',
+        'processing',
+        'ready_for_pickup',
+        'out_for_delivery',
+        'delivered',
+      ]
+
   return (
     <div>
-      <PageTitle title="Cedula applications" subtitle="Search, verify payments, and update fulfillment status." />
+      <PageTitle
+        title={isDelivery ? 'Delivery applications' : 'Cedula applications'}
+        subtitle={
+          isDelivery
+            ? 'Open a tracking number to update status. Click the applicant name to download the receipt PDF.'
+            : 'Search, verify payments, and update fulfillment status.'
+        }
+      />
       <Panel className="mb-6">
         <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
           <Input placeholder="Search tracking, name, email" value={q} onChange={(e) => setQ(e.target.value)} />
           <Select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">All statuses</option>
-            {[
-              'awaiting_payment',
-              'pending_verification',
-              'paid',
-              'processing',
-              'ready_for_pickup',
-              'out_for_delivery',
-              'delivered',
-            ].map((s) => (
+            {statusOptions.map((s) => (
               <option key={s} value={s}>{statusLabel(s)}</option>
             ))}
           </Select>
@@ -177,6 +192,7 @@ export function AdminApplicationDetail() {
 
   const name = app.corporation_name || `${app.first_name || ''} ${app.last_name || ''}`.trim()
   const isAdmin = user?.role === 'admin'
+  const isDelivery = user?.role === 'delivery'
   const isPaid = Boolean(app.paid_at) || !['awaiting_payment', 'pending_verification', 'cancelled'].includes(app.status)
   const softCopy = (app.documents || []).find((d) => d.type === 'soft_copy_cedula')
 
@@ -190,7 +206,19 @@ export function AdminApplicationDetail() {
             <div><strong>Mode:</strong> <span className="capitalize">{app.delivery_mode.replaceAll('_', ' ')}</span></div>
             <div><strong>Barangay:</strong> {app.barangay?.name}</div>
             <div><strong>Address:</strong> {app.address_line}</div>
+            <div><strong>City / Province:</strong> {[app.city, app.province].filter(Boolean).join(', ') || '—'}</div>
             <div><strong>Total:</strong> {formatPeso(app.total_due)}</div>
+          </div>
+
+          <div className="mt-4">
+            <a
+              className="inline-flex"
+              href={`/api/admin/applications/${app.id}/summary.pdf`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Button variant="secondary">Download receipt PDF</Button>
+            </a>
           </div>
 
           <Field label="Note" hint="Optional note for status or verification">
@@ -208,10 +236,16 @@ export function AdminApplicationDetail() {
               <>
                 <Button variant="secondary" onClick={() => void updateStatus('processing')}>Processing</Button>
                 <Button variant="secondary" onClick={() => void updateStatus('ready_for_pickup')}>Ready for pickup</Button>
+                <Button variant="secondary" onClick={() => void updateStatus('out_for_delivery')}>Out for delivery</Button>
+                <Button onClick={() => void updateStatus('delivered')}>Mark delivered</Button>
               </>
             ) : null}
-            <Button variant="secondary" onClick={() => void updateStatus('out_for_delivery')}>Out for delivery</Button>
-            <Button onClick={() => void updateStatus('delivered')}>Mark delivered</Button>
+            {isDelivery ? (
+              <>
+                <Button variant="secondary" onClick={() => void updateStatus('out_for_delivery')}>Out for delivery</Button>
+                <Button onClick={() => void updateStatus('delivered')}>Mark delivered</Button>
+              </>
+            ) : null}
           </div>
           {message ? <p className="mt-4 text-sm text-teal-deep">{message}</p> : null}
           {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}

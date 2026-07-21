@@ -62,6 +62,9 @@ Vite proxies `/api` and `/sanctum` to the Laravel server.
 | Admin    | `admin@ecedula.local`   | `password` |
 | Delivery | `delivery@ecedula.local`| `password` |
 
+Admins manage staff under **Admin → Staff users** (create/edit/delete delivery and admin accounts).  
+Delivery users open **Applications**, download receipt PDFs (applicant name / detail page), and mark **Out for delivery** / **Delivered**.
+
 Seed (users, tax defaults, landing copy, Cebu City barangays + delivery fees):
 
 ```bash

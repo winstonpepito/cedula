@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\ApplicationAdminController;
 use App\Http\Controllers\Api\Admin\ReportController;
 use App\Http\Controllers\Api\Admin\TaxSettingController;
+use App\Http\Controllers\Api\Admin\UserAdminController;
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BarangayController;
@@ -40,6 +41,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/tax-settings', [TaxSettingController::class, 'show'])->middleware('staff:admin');
         Route::put('/tax-settings', [TaxSettingController::class, 'update'])->middleware('staff:admin');
+
+        Route::get('/users', [UserAdminController::class, 'index'])->middleware('staff:admin');
+        Route::post('/users', [UserAdminController::class, 'store'])->middleware('staff:admin');
+        Route::put('/users/{user}', [UserAdminController::class, 'update'])->middleware('staff:admin');
+        Route::delete('/users/{user}', [UserAdminController::class, 'destroy'])->middleware('staff:admin');
 
         Route::get('/landing', [LandingContentController::class, 'adminShow'])->middleware('staff:admin');
         Route::post('/landing', [LandingContentController::class, 'update'])->middleware('staff:admin');

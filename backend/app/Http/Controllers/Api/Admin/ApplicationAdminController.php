@@ -54,8 +54,10 @@ class ApplicationAdminController extends Controller
         return response()->json($query->paginate(20));
     }
 
-    public function show(Application $application)
+    public function show(Request $request, Application $application)
     {
+        $this->ensureDeliveryCanAccess($request, $application);
+
         $application->load([
             'barangay.deliveryFee',
             'payments',
@@ -83,9 +85,7 @@ class ApplicationAdminController extends Controller
         $user = $request->user();
 
         if ($user->isDelivery()) {
-            if ($application->delivery_mode !== Application::MODE_DELIVERY) {
-                return response()->json(['message' => 'Not a delivery application.'], 403);
-            }
+            $this->ensureDeliveryCanAccess($request, $application);
             if (! in_array($data['status'], [
                 Application::STATUS_OUT_FOR_DELIVERY,
                 Application::STATUS_DELIVERED,
@@ -214,8 +214,10 @@ class ApplicationAdminController extends Controller
         ]);
     }
 
-    public function summaryPdf(Application $application, DocumentService $documents)
+    public function summaryPdf(Request $request, Application $application, DocumentService $documents)
     {
+        $this->ensureDeliveryCanAccess($request, $application);
+
         return $documents->downloadApplicationSummary($application);
     }
 
@@ -225,5 +227,17 @@ class ApplicationAdminController extends Controller
         abort_unless(Storage::disk('local')->exists($proof->file_path), 404);
 
         return Storage::disk('local')->response($proof->file_path);
+    }
+
+    private function ensureDeliveryCanAccess(Request $request, Application $application): void
+    {
+        $user = $request->user();
+        if (! $user?->isDelivery()) {
+            return;
+        }
+
+        if ($application->delivery_mode !== Application::MODE_DELIVERY) {
+            abort(403, 'Not a delivery application.');
+        }
     }
 }
