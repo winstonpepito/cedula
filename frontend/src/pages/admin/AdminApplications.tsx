@@ -94,7 +94,15 @@ export function AdminApplications() {
                     </Link>
                   </td>
                   <td className="py-3 pr-4">
-                    {row.corporation_name || `${row.first_name || ''} ${row.last_name || ''}`.trim()}
+                    <a
+                      className="font-semibold text-teal hover:underline"
+                      href={`/api/admin/applications/${row.id}/summary.pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Download PDF with receipt, applicant details, and address"
+                    >
+                      {row.corporation_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Applicant'}
+                    </a>
                     <div className="text-xs text-ink/45">{row.email}</div>
                   </td>
                   <td className="py-3 pr-4 capitalize">{row.delivery_mode.replaceAll('_', ' ')}</td>

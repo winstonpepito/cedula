@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\Document;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -82,6 +83,24 @@ class DocumentService
                 'original_name' => null,
             ]
         );
+    }
+
+    public function downloadApplicationSummary(Application $application): Response
+    {
+        $application->loadMissing('barangay');
+
+        $trackUrl = rtrim(config('app.frontend_url'), '/').'/t/'.$application->tracking_number;
+        $qrSvg = base64_encode(QrCode::format('svg')->size(160)->generate($trackUrl));
+
+        $pdf = Pdf::loadView('pdf.application-summary', [
+            'application' => $application,
+            'qrBase64' => $qrSvg,
+            'trackUrl' => $trackUrl,
+        ]);
+
+        $filename = 'application-'.$application->tracking_number.'.pdf';
+
+        return $pdf->download($filename);
     }
 
     public function storeUploadedSoftCopy(Application $application, UploadedFile $file): Document

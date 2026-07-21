@@ -214,6 +214,11 @@ class ApplicationAdminController extends Controller
         ]);
     }
 
+    public function summaryPdf(Application $application, DocumentService $documents)
+    {
+        return $documents->downloadApplicationSummary($application);
+    }
+
     public function proofFile(Application $application, PaymentProof $proof)
     {
         abort_unless($proof->application_id === $application->id, 404);

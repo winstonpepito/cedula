@@ -55,6 +55,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('staff:admin,delivery');
         Route::get('/applications/{application}', [ApplicationAdminController::class, 'show'])
             ->middleware('staff:admin,delivery');
+        Route::get('/applications/{application}/summary.pdf', [ApplicationAdminController::class, 'summaryPdf'])
+            ->middleware('staff:admin,delivery');
         Route::patch('/applications/{application}/status', [ApplicationAdminController::class, 'updateStatus'])
             ->middleware('staff:admin,delivery');
         Route::post('/applications/{application}/verify-payment', [ApplicationAdminController::class, 'verifyPayment'])
