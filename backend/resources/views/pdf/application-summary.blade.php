@@ -49,6 +49,18 @@
     <div class="row"><span class="label">Phone</span> {{ $application->phone ?: '—' }}</div>
     <div class="row"><span class="label">TIN</span> {{ $application->tin ?: '—' }}</div>
 
+    @if ($application->applicant_type === 'individual')
+        <h2>Income details</h2>
+        <div class="row"><span class="label">Monthly salary</span> PHP {{ number_format((float) ($application->monthly_salary ?? 0), 2) }}</div>
+        <div class="row"><span class="label">13th month</span> PHP {{ number_format((float) ($application->thirteenth_month ?? 0), 2) }}</div>
+        <div class="row"><span class="label">Other bonuses</span> PHP {{ number_format((float) ($application->other_bonuses ?? 0), 2) }}</div>
+        <div class="row"><span class="label">Annual income</span> PHP {{ number_format((float) ($application->annual_income ?? 0), 2) }}</div>
+    @else
+        <h2>Business details</h2>
+        <div class="row"><span class="label">Property value</span> PHP {{ number_format((float) ($application->property_value ?? 0), 2) }}</div>
+        <div class="row"><span class="label">Gross receipts</span> PHP {{ number_format((float) ($application->gross_receipts ?? 0), 2) }}</div>
+    @endif
+
     <h2>Address</h2>
     <div class="row"><span class="label">Street / line</span> {{ $application->address_line }}</div>
     <div class="row"><span class="label">Barangay</span> {{ $application->barangay?->name ?: '—' }}</div>
