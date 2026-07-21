@@ -153,7 +153,7 @@ export function ApplyPage() {
     <SimpleLayout>
       <PageTitle
         title="Apply for Cedula"
-        subtitle="Complete the guided form. Totals are calculated from official community tax rules and your selected delivery mode."
+        subtitle="Complete the guided form. Totals are calculated from official community tax rules and your selected delivery mode. Applications and claims are available only during weekdays office hours. Applications submitted in the afternoon are processed the following day."
       />
 
       <div className="mb-6 flex flex-wrap gap-2">
