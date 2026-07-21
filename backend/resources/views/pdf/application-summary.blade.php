@@ -100,8 +100,10 @@
     </table>
 
     <div class="qr">
-        <img src="data:image/svg+xml;base64,{{ $qrBase64 }}" width="120" height="120" alt="QR">
-        <div style="margin-top:8px;">Scan to view transaction online</div>
+        @if (!empty($qrDataUri))
+            <img src="{{ $qrDataUri }}" width="120" height="120" alt="QR">
+            <div style="margin-top:8px;">Scan to view transaction online</div>
+        @endif
         <div style="font-size:10px;color:#5a6b6e;">{{ $trackUrl }}</div>
     </div>
 

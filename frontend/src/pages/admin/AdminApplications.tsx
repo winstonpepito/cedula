@@ -111,7 +111,7 @@ export function AdminApplications() {
                   <td className="py-3 pr-4">
                     <a
                       className="font-semibold text-teal hover:underline"
-                      href={`/api/admin/applications/${row.id}/summary.pdf`}
+                      href={`/api/admin/applications/${row.id}/summary-pdf`}
                       target="_blank"
                       rel="noreferrer"
                       title="Download PDF with receipt, applicant details, and address"
@@ -213,7 +213,7 @@ export function AdminApplicationDetail() {
           <div className="mt-4">
             <a
               className="inline-flex"
-              href={`/api/admin/applications/${app.id}/summary.pdf`}
+              href={`/api/admin/applications/${app.id}/summary-pdf`}
               target="_blank"
               rel="noreferrer"
             >

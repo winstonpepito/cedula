@@ -189,7 +189,7 @@ class ApplicationFlowTest extends TestCase
             ->assertOk();
 
         $this->actingAs($rider)
-            ->get("/api/admin/applications/{$application->id}/summary.pdf")
+            ->get("/api/admin/applications/{$application->id}/summary-pdf")
             ->assertOk();
 
         $this->actingAs($rider)

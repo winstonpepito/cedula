@@ -5,10 +5,12 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\Document;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class DocumentService
 {
@@ -21,12 +23,13 @@ class DocumentService
 
     public function generateReceipt(Application $application): Document
     {
-        $trackUrl = rtrim(config('app.frontend_url'), '/').'/t/'.$application->tracking_number;
-        $qrSvg = base64_encode(QrCode::format('svg')->size(180)->generate($trackUrl));
+        $this->ensurePdfWritablePaths();
+
+        $trackUrl = rtrim((string) config('app.frontend_url'), '/').'/t/'.$application->tracking_number;
 
         $pdf = Pdf::loadView('pdf.receipt', [
             'application' => $application->loadMissing('barangay'),
-            'qrBase64' => $qrSvg,
+            'qrDataUri' => $this->qrDataUri($trackUrl, 180),
             'trackUrl' => $trackUrl,
         ]);
 
@@ -59,12 +62,13 @@ class DocumentService
             return $existing;
         }
 
-        $trackUrl = rtrim(config('app.frontend_url'), '/').'/t/'.$application->tracking_number;
-        $qrSvg = base64_encode(QrCode::format('svg')->size(140)->generate($trackUrl));
+        $this->ensurePdfWritablePaths();
+
+        $trackUrl = rtrim((string) config('app.frontend_url'), '/').'/t/'.$application->tracking_number;
 
         $pdf = Pdf::loadView('pdf.soft-copy', [
             'application' => $application->loadMissing('barangay'),
-            'qrBase64' => $qrSvg,
+            'qrDataUri' => $this->qrDataUri($trackUrl, 140),
             'trackUrl' => $trackUrl,
         ]);
 
@@ -87,20 +91,30 @@ class DocumentService
 
     public function downloadApplicationSummary(Application $application): Response
     {
+        $this->ensurePdfWritablePaths();
         $application->loadMissing('barangay');
 
-        $trackUrl = rtrim(config('app.frontend_url'), '/').'/t/'.$application->tracking_number;
-        $qrSvg = base64_encode(QrCode::format('svg')->size(160)->generate($trackUrl));
+        $trackUrl = rtrim((string) config('app.frontend_url'), '/').'/t/'.$application->tracking_number;
 
-        $pdf = Pdf::loadView('pdf.application-summary', [
-            'application' => $application,
-            'qrBase64' => $qrSvg,
-            'trackUrl' => $trackUrl,
-        ]);
+        try {
+            $pdf = Pdf::loadView('pdf.application-summary', [
+                'application' => $application,
+                'qrDataUri' => $this->qrDataUri($trackUrl, 160),
+                'trackUrl' => $trackUrl,
+            ]);
 
-        $filename = 'application-'.$application->tracking_number.'.pdf';
+            $filename = 'application-'.$application->tracking_number.'.pdf';
 
-        return $pdf->download($filename);
+            return $pdf->download($filename);
+        } catch (Throwable $e) {
+            Log::error('Application summary PDF failed', [
+                'application_id' => $application->id,
+                'tracking' => $application->tracking_number,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
     }
 
     public function storeUploadedSoftCopy(Application $application, UploadedFile $file): Document
@@ -134,5 +148,39 @@ class DocumentService
                 'original_name' => $file->getClientOriginalName(),
             ]
         );
+    }
+
+    private function ensurePdfWritablePaths(): void
+    {
+        $fonts = storage_path('fonts');
+        if (! is_dir($fonts)) {
+            @mkdir($fonts, 0775, true);
+        }
+
+        Storage::disk('local')->makeDirectory('documents');
+    }
+
+    /**
+     * DomPDF handles PNG data-URIs more reliably than SVG on many servers.
+     */
+    private function qrDataUri(string $url, int $size = 160): ?string
+    {
+        try {
+            if (extension_loaded('gd')) {
+                $png = QrCode::format('png')->size($size)->margin(1)->generate($url);
+
+                return 'data:image/png;base64,'.base64_encode($png);
+            }
+
+            $svg = QrCode::format('svg')->size($size)->margin(1)->generate($url);
+
+            return 'data:image/svg+xml;base64,'.base64_encode($svg);
+        } catch (Throwable $e) {
+            Log::warning('QR code generation skipped for PDF', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }

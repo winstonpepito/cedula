@@ -121,7 +121,7 @@ if [[ "$SKIP_BACKEND" != "1" ]]; then
   log "Backend: permissions (owner=$DEPLOY_USER group=$PHP_USER for PHP-FPM writes)"
   # Deploy user owns files; PHP-FPM pool user is the group so uploads work.
   # On Amazon Linux this is often "apache", not "nginx".
-  mkdir -p storage/app/public/landing storage/app/private storage/framework/{cache,sessions,views} storage/logs
+  mkdir -p storage/app/public/landing storage/app/private storage/fonts storage/framework/{cache,sessions,views} storage/logs
   sudo chown -R "$DEPLOY_USER:$PHP_USER" storage bootstrap/cache
   sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \;
   sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;

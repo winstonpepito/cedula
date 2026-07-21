@@ -56,7 +56,9 @@
         </div>
 
         <div style="text-align:center;margin-top:22px;">
-            <img src="data:image/svg+xml;base64,{{ $qrBase64 }}" width="120" height="120" alt="QR">
+            @if (!empty($qrDataUri))
+                <img src="{{ $qrDataUri }}" width="120" height="120" alt="QR">
+            @endif
             <div style="font-size:10px;color:#5a6b6e;margin-top:6px;">{{ $trackUrl }}</div>
         </div>
 
