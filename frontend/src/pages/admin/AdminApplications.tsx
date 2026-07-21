@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Button, Field, Input, PageTitle, Panel, Select } from '../../components/ui'
-import { api, formatPeso, statusLabel } from '../../lib/api'
+import { api, downloadAdminPdf, formatPeso, statusLabel } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 
 interface AdminApp {
@@ -40,6 +40,7 @@ export function AdminApplications() {
   const [rows, setRows] = useState<AdminApp[]>([])
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
+  const [listError, setListError] = useState('')
   const isDelivery = user?.role === 'delivery'
 
   async function load() {
@@ -52,6 +53,18 @@ export function AdminApplications() {
   useEffect(() => {
     void load()
   }, [])
+
+  async function downloadSummary(row: AdminApp) {
+    setListError('')
+    try {
+      await downloadAdminPdf(
+        `/admin/applications/${row.id}/summary-pdf`,
+        `application-${row.tracking_number}.pdf`,
+      )
+    } catch {
+      setListError('Unable to download receipt PDF. Try signing in again.')
+    }
+  }
 
   const statusOptions = isDelivery
     ? ['processing', 'out_for_delivery', 'delivered', 'paid']
@@ -86,6 +99,7 @@ export function AdminApplications() {
           </Select>
           <Button onClick={() => void load()}>Filter</Button>
         </div>
+        {listError ? <p className="mt-3 text-sm text-accent">{listError}</p> : null}
       </Panel>
 
       <Panel>
@@ -109,15 +123,14 @@ export function AdminApplications() {
                     </Link>
                   </td>
                   <td className="py-3 pr-4">
-                    <a
+                    <button
+                      type="button"
                       className="font-semibold text-teal hover:underline"
-                      href={`/api/admin/applications/${row.id}/summary-pdf`}
-                      target="_blank"
-                      rel="noreferrer"
                       title="Download PDF with receipt, applicant details, and address"
+                      onClick={() => void downloadSummary(row)}
                     >
                       {row.corporation_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Applicant'}
-                    </a>
+                    </button>
                     <div className="text-xs text-ink/45">{row.email}</div>
                   </td>
                   <td className="py-3 pr-4 capitalize">{row.delivery_mode.replaceAll('_', ' ')}</td>
@@ -188,6 +201,19 @@ export function AdminApplicationDetail() {
     }
   }
 
+  async function downloadSummaryPdf() {
+    if (!app) return
+    setError('')
+    try {
+      await downloadAdminPdf(
+        `/admin/applications/${app.id}/summary-pdf`,
+        `application-${app.tracking_number}.pdf`,
+      )
+    } catch {
+      setError('Unable to download receipt PDF. Try signing in again.')
+    }
+  }
+
   if (!app) return <p>Loading…</p>
 
   const name = app.corporation_name || `${app.first_name || ''} ${app.last_name || ''}`.trim()
@@ -211,14 +237,9 @@ export function AdminApplicationDetail() {
           </div>
 
           <div className="mt-4">
-            <a
-              className="inline-flex"
-              href={`/api/admin/applications/${app.id}/summary-pdf`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Button variant="secondary">Download receipt PDF</Button>
-            </a>
+            <Button variant="secondary" onClick={() => void downloadSummaryPdf()}>
+              Download receipt PDF
+            </Button>
           </div>
 
           <Field label="Note" hint="Optional note for status or verification">
