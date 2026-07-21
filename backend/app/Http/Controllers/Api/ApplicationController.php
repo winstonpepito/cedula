@@ -167,9 +167,14 @@ class ApplicationController extends Controller
 
         abort_unless(Storage::disk($document->disk)->exists($document->file_path), 404);
 
+        $extension = pathinfo($document->file_path, PATHINFO_EXTENSION) ?: 'pdf';
+        $basename = $document->type === Document::TYPE_SOFT_COPY
+            ? 'cedula-soft-copy-'.$application->tracking_number
+            : $document->type.'-'.$application->tracking_number;
+
         return Storage::disk($document->disk)->download(
             $document->file_path,
-            $document->type.'-'.$application->tracking_number.'.pdf'
+            $basename.'.'.$extension
         );
     }
 
@@ -252,6 +257,8 @@ class ApplicationController extends Controller
             'documents' => $application->documents->map(fn (Document $d) => [
                 'id' => $d->id,
                 'type' => $d->type,
+                'is_uploaded' => (bool) $d->is_uploaded,
+                'original_name' => $d->original_name,
                 'download_url' => '/api/applications/'.$application->tracking_number.'/documents/'.$d->id,
             ]),
             'status_logs' => $application->statusLogs,

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\Document;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
@@ -13,10 +14,8 @@ class DocumentService
     public function generateForPaidApplication(Application $application): void
     {
         $this->generateReceipt($application);
-
-        if ($application->delivery_mode === Application::MODE_SOFT_COPY) {
-            $this->generateSoftCopy($application);
-        }
+        // Official CTC soft copy is uploaded by admin for applicant download.
+        // Do not auto-generate a placeholder PDF that could be mistaken for the real certificate.
     }
 
     public function generateReceipt(Application $application): Document
@@ -41,12 +40,24 @@ class DocumentService
             [
                 'file_path' => $path,
                 'disk' => 'local',
+                'is_uploaded' => false,
+                'original_name' => null,
             ]
         );
     }
 
-    public function generateSoftCopy(Application $application): Document
+    public function generateSoftCopy(Application $application): ?Document
     {
+        $existing = Document::query()
+            ->where('application_id', $application->id)
+            ->where('type', Document::TYPE_SOFT_COPY)
+            ->first();
+
+        // Never overwrite an admin-uploaded official CTC soft copy.
+        if ($existing?->is_uploaded) {
+            return $existing;
+        }
+
         $trackUrl = rtrim(config('app.frontend_url'), '/').'/t/'.$application->tracking_number;
         $qrSvg = base64_encode(QrCode::format('svg')->size(140)->generate($trackUrl));
 
@@ -67,6 +78,41 @@ class DocumentService
             [
                 'file_path' => $path,
                 'disk' => 'local',
+                'is_uploaded' => false,
+                'original_name' => null,
+            ]
+        );
+    }
+
+    public function storeUploadedSoftCopy(Application $application, UploadedFile $file): Document
+    {
+        $disk = Storage::disk('local');
+        $dir = 'documents/'.$application->tracking_number;
+        $disk->makeDirectory($dir);
+
+        $existing = Document::query()
+            ->where('application_id', $application->id)
+            ->where('type', Document::TYPE_SOFT_COPY)
+            ->first();
+
+        if ($existing && $disk->exists($existing->file_path)) {
+            $disk->delete($existing->file_path);
+        }
+
+        $extension = strtolower($file->getClientOriginalExtension() ?: 'pdf');
+        $path = $dir.'/soft-copy.'.$extension;
+        $disk->putFileAs($dir, $file, 'soft-copy.'.$extension);
+
+        return Document::updateOrCreate(
+            [
+                'application_id' => $application->id,
+                'type' => Document::TYPE_SOFT_COPY,
+            ],
+            [
+                'file_path' => $path,
+                'disk' => 'local',
+                'is_uploaded' => true,
+                'original_name' => $file->getClientOriginalName(),
             ]
         );
     }

@@ -158,6 +158,19 @@ class Application extends Model
 
     public function canDownloadSoftCopy(): bool
     {
-        return $this->isPaid() && $this->delivery_mode === self::MODE_SOFT_COPY;
+        if (! $this->isPaid()) {
+            return false;
+        }
+
+        // Soft copy is downloadable once a file exists (auto-generated or admin-uploaded).
+        if ($this->relationLoaded('documents')) {
+            return $this->documents->contains(
+                fn (Document $document) => $document->type === Document::TYPE_SOFT_COPY
+            );
+        }
+
+        return $this->documents()
+            ->where('type', Document::TYPE_SOFT_COPY)
+            ->exists();
     }
 }

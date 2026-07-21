@@ -61,6 +61,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('staff:admin');
         Route::post('/applications/{application}/regenerate-documents', [ApplicationAdminController::class, 'regenerateDocuments'])
             ->middleware('staff:admin');
+        Route::post('/applications/{application}/soft-copy', [ApplicationAdminController::class, 'uploadSoftCopy'])
+            ->middleware('staff:admin');
         Route::get('/applications/{application}/proofs/{proof}/file', [ApplicationAdminController::class, 'proofFile'])
             ->middleware('staff:admin');
     });

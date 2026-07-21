@@ -56,7 +56,13 @@ export interface Application {
   created_at?: string
   can_download_soft_copy: boolean
   is_paid: boolean
-  documents: Array<{ id: number; type: string; download_url: string }>
+  documents: Array<{
+    id: number
+    type: string
+    download_url: string
+    is_uploaded?: boolean
+    original_name?: string | null
+  }>
   status_logs: Array<{
     id: number
     from_status?: string

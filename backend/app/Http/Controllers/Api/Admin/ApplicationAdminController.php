@@ -173,6 +173,47 @@ class ApplicationAdminController extends Controller
         ]);
     }
 
+    public function uploadSoftCopy(
+        Request $request,
+        Application $application,
+        DocumentService $documents,
+        ApplicationService $service,
+    ) {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        if (! $application->isPaid()) {
+            return response()->json([
+                'message' => 'Soft copy can only be uploaded after payment is confirmed.',
+            ], 422);
+        }
+
+        $data = $request->validate([
+            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+        ]);
+
+        $document = $documents->storeUploadedSoftCopy($application, $data['file']);
+
+        $service->logStatus(
+            $application,
+            $application->status,
+            $application->status,
+            'Official CTC soft copy uploaded for applicant download',
+            'admin',
+            $request->user()->id,
+        );
+
+        return response()->json([
+            'data' => $application->fresh([
+                'barangay.deliveryFee',
+                'payments',
+                'paymentProofs.verifier',
+                'documents',
+                'statusLogs.user',
+            ]),
+            'document' => $document,
+        ]);
+    }
+
     public function proofFile(Application $application, PaymentProof $proof)
     {
         abort_unless($proof->application_id === $application->id, 404);

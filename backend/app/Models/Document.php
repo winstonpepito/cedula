@@ -16,7 +16,16 @@ class Document extends Model
         'type',
         'file_path',
         'disk',
+        'is_uploaded',
+        'original_name',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_uploaded' => 'boolean',
+        ];
+    }
 
     public function application(): BelongsTo
     {

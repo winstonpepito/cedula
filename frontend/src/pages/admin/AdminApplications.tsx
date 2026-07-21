@@ -17,6 +17,7 @@ interface AdminApp {
   applicant_type: string
   barangay?: { name: string }
   address_line?: string
+  paid_at?: string | null
   payment_proofs?: Array<{
     id: number
     status: string
@@ -24,7 +25,12 @@ interface AdminApp {
     notes?: string
   }>
   status_logs?: Array<{ id: number; to_status: string; note?: string; created_at: string }>
-  documents?: Array<{ id: number; type: string }>
+  documents?: Array<{
+    id: number
+    type: string
+    is_uploaded?: boolean
+    original_name?: string | null
+  }>
 }
 
 export function AdminApplications() {
@@ -110,6 +116,9 @@ export function AdminApplicationDetail() {
   const [app, setApp] = useState<AdminApp | null>(null)
   const [note, setNote] = useState('')
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [softCopyFile, setSoftCopyFile] = useState<File | null>(null)
+  const [uploadingSoftCopy, setUploadingSoftCopy] = useState(false)
 
   async function load() {
     const { data } = await api.get(`/admin/applications/${id}`)
@@ -135,10 +144,33 @@ export function AdminApplicationDetail() {
     await load()
   }
 
+  async function uploadSoftCopy() {
+    if (!softCopyFile || !app) return
+    setUploadingSoftCopy(true)
+    setError('')
+    setMessage('')
+    try {
+      const body = new FormData()
+      body.append('file', softCopyFile)
+      await api.post(`/admin/applications/${app.id}/soft-copy`, body, {
+        headers: { 'Content-Type': undefined },
+      })
+      setSoftCopyFile(null)
+      setMessage('CTC soft copy uploaded. The applicant can download it from their receipt page.')
+      await load()
+    } catch {
+      setError('Unable to upload soft copy. Use PDF or image up to 10MB after payment is confirmed.')
+    } finally {
+      setUploadingSoftCopy(false)
+    }
+  }
+
   if (!app) return <p>Loading…</p>
 
   const name = app.corporation_name || `${app.first_name || ''} ${app.last_name || ''}`.trim()
   const isAdmin = user?.role === 'admin'
+  const isPaid = Boolean(app.paid_at) || !['awaiting_payment', 'pending_verification', 'cancelled'].includes(app.status)
+  const softCopy = (app.documents || []).find((d) => d.type === 'soft_copy_cedula')
 
   return (
     <div>
@@ -174,9 +206,57 @@ export function AdminApplicationDetail() {
             <Button onClick={() => void updateStatus('delivered')}>Mark delivered</Button>
           </div>
           {message ? <p className="mt-4 text-sm text-teal-deep">{message}</p> : null}
+          {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}
         </Panel>
 
         <Panel>
+          {isAdmin ? (
+            <div className="mb-6">
+              <h3 className="font-display text-xl font-bold">CTC soft copy</h3>
+              <p className="mt-1 text-sm text-ink/55">
+                Upload the official Community Tax Certificate for the applicant to download on their receipt page.
+              </p>
+              {softCopy ? (
+                <div className="mt-3 rounded-xl bg-mist p-3 text-sm">
+                  <div className="font-semibold">
+                    {softCopy.is_uploaded ? 'Official upload on file' : 'Generated placeholder on file'}
+                  </div>
+                  <div className="text-ink/60">{softCopy.original_name || 'soft-copy.pdf'}</div>
+                  <a
+                    className="mt-2 inline-block font-semibold text-teal"
+                    href={`/api/applications/${app.tracking_number}/documents/${softCopy.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Preview / download
+                  </a>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-ink/50">No soft copy uploaded yet.</p>
+              )}
+              {isPaid ? (
+                <div className="mt-4 space-y-3">
+                  <Field label="Upload file" hint="PDF or image, up to 10MB.">
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={(e) => setSoftCopyFile(e.target.files?.[0] || null)}
+                      className="block w-full text-sm"
+                    />
+                  </Field>
+                  <Button
+                    disabled={!softCopyFile || uploadingSoftCopy}
+                    onClick={() => void uploadSoftCopy()}
+                  >
+                    {uploadingSoftCopy ? 'Uploading…' : softCopy ? 'Replace soft copy' : 'Upload soft copy'}
+                  </Button>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-ink/50">Available after payment is confirmed.</p>
+              )}
+            </div>
+          ) : null}
+
           <h3 className="font-display text-xl font-bold">Payment proofs</h3>
           <ul className="mt-3 space-y-3 text-sm">
             {(app.payment_proofs || []).map((proof) => (

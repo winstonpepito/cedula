@@ -70,18 +70,59 @@ class ApplicationFlowTest extends TestCase
         $mock = $this->postJson("/api/applications/{$tracking}/mock-pay");
         $mock->assertOk();
         $this->assertTrue($mock->json('data.is_paid'));
-        $this->assertTrue($mock->json('data.can_download_soft_copy'));
-        $this->assertNotEmpty($mock->json('data.documents'));
+        // Soft copy is available only after admin uploads the official CTC.
+        $this->assertFalse($mock->json('data.can_download_soft_copy'));
 
         $application = Application::where('tracking_number', $tracking)->firstOrFail();
         $this->assertDatabaseHas('documents', [
             'application_id' => $application->id,
             'type' => 'receipt',
         ]);
-        $this->assertDatabaseHas('documents', [
+        $this->assertDatabaseMissing('documents', [
             'application_id' => $application->id,
             'type' => 'soft_copy_cedula',
         ]);
+    }
+
+    public function test_admin_can_upload_soft_copy_for_applicant_download(): void
+    {
+        Storage::fake('local');
+
+        $create = $this->postJson('/api/applications', [
+            'applicant_type' => 'individual',
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+            'email' => 'juan@example.com',
+            'address_line' => '123 Main St',
+            'barangay_id' => $this->barangay->id,
+            'delivery_mode' => 'soft_copy',
+            'monthly_salary' => 20000,
+            'thirteenth_month' => 0,
+            'other_bonuses' => 0,
+        ])->assertCreated();
+
+        $tracking = $create->json('data.tracking_number');
+        $this->postJson("/api/applications/{$tracking}/pay")->assertOk();
+        $this->postJson("/api/applications/{$tracking}/mock-pay")->assertOk();
+
+        $application = Application::where('tracking_number', $tracking)->firstOrFail();
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->post("/api/admin/applications/{$application->id}/soft-copy", [
+                'file' => UploadedFile::fake()->create('cedula.pdf', 120, 'application/pdf'),
+            ])
+            ->assertOk();
+
+        $show = $this->getJson("/api/applications/{$tracking}")->assertOk();
+        $this->assertTrue($show->json('data.can_download_soft_copy'));
+        $this->assertTrue(collect($show->json('data.documents'))->contains('type', 'soft_copy_cedula'));
+
+        $documentId = collect($show->json('data.documents'))
+            ->firstWhere('type', 'soft_copy_cedula')['id'];
+
+        $this->get("/api/applications/{$tracking}/documents/{$documentId}")
+            ->assertOk();
     }
 
     public function test_payment_proof_admin_verify(): void

@@ -63,7 +63,7 @@ export function ReceiptPage() {
             ) : null}
             {app.can_download_soft_copy && softCopy ? (
               <a href={softCopy.download_url} target="_blank" rel="noreferrer">
-                <Button variant="secondary">Download soft copy</Button>
+                <Button variant="secondary">Download CTC soft copy</Button>
               </a>
             ) : null}
             {!app.is_paid ? (
@@ -72,6 +72,11 @@ export function ReceiptPage() {
               </Link>
             ) : null}
           </div>
+          {app.is_paid && !softCopy ? (
+            <p className="mt-4 text-sm text-ink/55">
+              Your Community Tax Certificate soft copy will appear here once the office uploads it.
+            </p>
+          ) : null}
         </Panel>
 
         <Panel className="animate-rise delay-1 text-center">
