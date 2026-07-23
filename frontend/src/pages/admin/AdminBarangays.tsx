@@ -12,13 +12,23 @@ export function AdminBarangays() {
   const [defaultBusy, setDefaultBusy] = useState(false)
   const [defaultSaved, setDefaultSaved] = useState(false)
   const [defaultError, setDefaultError] = useState('')
+  const [feeDrafts, setFeeDrafts] = useState<Record<number, string>>({})
+  const [feeSavingId, setFeeSavingId] = useState<number | null>(null)
+  const [feeSavedId, setFeeSavedId] = useState<number | null>(null)
+  const [feeError, setFeeError] = useState('')
 
   async function load() {
     const [barangaysRes, defaultRes] = await Promise.all([
       api.get('/admin/barangays'),
       api.get('/admin/barangays/default'),
     ])
-    setRows(barangaysRes.data.data)
+    const list = barangaysRes.data.data as Barangay[]
+    setRows(list)
+    const drafts: Record<number, string> = {}
+    for (const row of list) {
+      drafts[row.id] = String(Number(row.deliveryFee?.fee ?? 0))
+    }
+    setFeeDrafts(drafts)
     const id = defaultRes.data.data.default_barangay_id
     setDefaultBarangayId(id != null ? String(id) : '')
   }
@@ -40,11 +50,33 @@ export function AdminBarangays() {
     await load()
   }
 
-  async function updateFee(barangay: Barangay, nextFee: string) {
-    await api.put(`/admin/barangays/${barangay.id}`, {
-      delivery_fee: Number(nextFee),
-    })
-    await load()
+  function feeIsDirty(row: Barangay) {
+    const draft = feeDrafts[row.id]
+    if (draft == null) return false
+    return Number(draft) !== Number(row.deliveryFee?.fee ?? 0)
+  }
+
+  async function saveFee(barangay: Barangay) {
+    const nextFee = feeDrafts[barangay.id]
+    if (nextFee == null || nextFee === '') {
+      setFeeError('Enter a delivery fee amount.')
+      return
+    }
+    setFeeSavingId(barangay.id)
+    setFeeError('')
+    setFeeSavedId(null)
+    try {
+      await api.put(`/admin/barangays/${barangay.id}`, {
+        delivery_fee: Number(nextFee),
+      })
+      await load()
+      setFeeSavedId(barangay.id)
+      setTimeout(() => setFeeSavedId((current) => (current === barangay.id ? null : current)), 2000)
+    } catch {
+      setFeeError(`Unable to save fee for ${barangay.name}.`)
+    } finally {
+      setFeeSavingId(null)
+    }
   }
 
   async function remove(barangay: Barangay) {
@@ -75,7 +107,10 @@ export function AdminBarangays() {
 
   return (
     <div>
-      <PageTitle title="Barangays & delivery fees" subtitle="Delivery charges are looked up from the applicant barangay." />
+      <PageTitle
+        title="Barangays & delivery fees"
+        subtitle="Edit a barangay delivery fee, then click Save fee. Delivery charges are looked up from the applicant barangay."
+      />
 
       <Panel className="mb-6">
         <form className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end" onSubmit={(e) => void saveDefault(e)}>
@@ -114,6 +149,8 @@ export function AdminBarangays() {
         </form>
       </Panel>
 
+      {feeError ? <p className="mb-4 text-sm text-accent">{feeError}</p> : null}
+
       <Panel>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -121,49 +158,78 @@ export function AdminBarangays() {
               <tr>
                 <th className="py-2 pr-4">Name</th>
                 <th className="py-2 pr-4">Code</th>
-                <th className="py-2 pr-4">Fee</th>
+                <th className="py-2 pr-4">Delivery fee</th>
                 <th className="py-2 pr-4">Active</th>
                 <th className="py-2 pr-4">Default</th>
                 <th className="py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-t border-line/50">
-                  <td className="py-3 pr-4 font-semibold">{row.name}</td>
-                  <td className="py-3 pr-4">{row.code}</td>
-                  <td className="py-3 pr-4">
-                    <input
-                      type="number"
-                      className="w-28 rounded-lg border border-line px-2 py-1"
-                      defaultValue={Number(row.deliveryFee?.fee ?? 0)}
-                      onBlur={(e) => void updateFee(row, e.target.value)}
-                    />
-                    <div className="text-xs text-ink/45">{formatPeso(row.deliveryFee?.fee ?? 0)}</div>
-                  </td>
-                  <td className="py-3 pr-4">{row.is_active ? 'Yes' : 'No'}</td>
-                  <td className="py-3 pr-4">
-                    {String(row.id) === defaultBarangayId ? (
-                      <span className="rounded-md bg-teal-soft px-2 py-0.5 text-xs font-semibold text-teal-deep">Default</span>
-                    ) : (
-                      <span className="text-ink/35">—</span>
-                    )}
-                  </td>
-                  <td className="py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => void remove(row)}
-                      title={`Delete ${row.name}`}
-                      aria-label={`Delete ${row.name}`}
-                      className="inline-flex rounded-lg p-2 text-accent transition hover:bg-accent/10"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6m2 0v13.5A1.5 1.5 0 0 1 16.5 21h-9A1.5 1.5 0 0 1 6 19.5V6m3 4.5v7m6-7v7" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const dirty = feeIsDirty(row)
+                const saving = feeSavingId === row.id
+                const saved = feeSavedId === row.id
+                return (
+                  <tr key={row.id} className="border-t border-line/50">
+                    <td className="py-3 pr-4 font-semibold">{row.name}</td>
+                    <td className="py-3 pr-4">{row.code}</td>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="w-28 rounded-lg border border-line px-2 py-1"
+                          value={feeDrafts[row.id] ?? '0'}
+                          onChange={(e) => {
+                            setFeeDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))
+                            setFeeError('')
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              void saveFee(row)
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant={dirty ? 'primary' : 'secondary'}
+                          disabled={saving || !dirty}
+                          onClick={() => void saveFee(row)}
+                        >
+                          {saving ? 'Saving…' : 'Save fee'}
+                        </Button>
+                        {saved ? <span className="text-xs text-teal-deep">Saved</span> : null}
+                      </div>
+                      <div className="mt-1 text-xs text-ink/45">
+                        Current: {formatPeso(row.deliveryFee?.fee ?? 0)}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">{row.is_active ? 'Yes' : 'No'}</td>
+                    <td className="py-3 pr-4">
+                      {String(row.id) === defaultBarangayId ? (
+                        <span className="rounded-md bg-teal-soft px-2 py-0.5 text-xs font-semibold text-teal-deep">Default</span>
+                      ) : (
+                        <span className="text-ink/35">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => void remove(row)}
+                        title={`Delete ${row.name}`}
+                        aria-label={`Delete ${row.name}`}
+                        className="inline-flex rounded-lg p-2 text-accent transition hover:bg-accent/10"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6m2 0v13.5A1.5 1.5 0 0 1 16.5 21h-9A1.5 1.5 0 0 1 6 19.5V6m3 4.5v7m6-7v7" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
