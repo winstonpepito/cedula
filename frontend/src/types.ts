@@ -1,16 +1,19 @@
 export type ApplicantType = 'individual' | 'corporation'
 export type DeliveryMode = 'soft_copy' | 'pickup' | 'delivery'
 
+export interface BarangayDeliveryFeeInfo {
+  fee: number | string
+  is_active?: boolean
+}
+
 export interface Barangay {
   id: number
   name: string
   code?: string
+  /** Flat delivery fee amount (public + admin list/update). */
   delivery_fee?: number | string
   is_active?: boolean
-  deliveryFee?: {
-    fee: number | string
-    is_active: boolean
-  }
+  deliveryFee?: BarangayDeliveryFeeInfo
 }
 
 export interface Breakdown {

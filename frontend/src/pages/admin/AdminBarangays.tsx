@@ -1,7 +1,20 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { isAxiosError } from 'axios'
 import { Button, Field, Input, PageTitle, Panel, Select } from '../../components/ui'
 import { api, formatPeso } from '../../lib/api'
 import type { Barangay } from '../../types'
+
+function barangayFeeAmount(row: Barangay): number {
+  if (row.deliveryFee?.fee != null && row.deliveryFee.fee !== '') {
+    return Number(row.deliveryFee.fee)
+  }
+
+  if (row.delivery_fee != null && row.delivery_fee !== '') {
+    return Number(row.delivery_fee)
+  }
+
+  return 0
+}
 
 export function AdminBarangays() {
   const [rows, setRows] = useState<Barangay[]>([])
@@ -26,7 +39,7 @@ export function AdminBarangays() {
     setRows(list)
     const drafts: Record<number, string> = {}
     for (const row of list) {
-      drafts[row.id] = String(Number(row.deliveryFee?.fee ?? 0))
+      drafts[row.id] = String(barangayFeeAmount(row))
     }
     setFeeDrafts(drafts)
     const id = defaultRes.data.data.default_barangay_id
@@ -53,7 +66,7 @@ export function AdminBarangays() {
   function feeIsDirty(row: Barangay) {
     const draft = feeDrafts[row.id]
     if (draft == null) return false
-    return Number(draft) !== Number(row.deliveryFee?.fee ?? 0)
+    return Number(draft) !== barangayFeeAmount(row)
   }
 
   async function saveFee(barangay: Barangay) {
@@ -72,8 +85,14 @@ export function AdminBarangays() {
       await load()
       setFeeSavedId(barangay.id)
       setTimeout(() => setFeeSavedId((current) => (current === barangay.id ? null : current)), 2000)
-    } catch {
-      setFeeError(`Unable to save fee for ${barangay.name}.`)
+    } catch (err) {
+      let message = `Unable to save fee for ${barangay.name}.`
+      if (isAxiosError(err)) {
+        const data = err.response?.data as { message?: string; errors?: Record<string, string[]> } | undefined
+        const firstError = data?.errors ? Object.values(data.errors).flat()[0] : undefined
+        message = firstError || data?.message || message
+      }
+      setFeeError(message)
     } finally {
       setFeeSavingId(null)
     }
@@ -169,6 +188,7 @@ export function AdminBarangays() {
                 const dirty = feeIsDirty(row)
                 const saving = feeSavingId === row.id
                 const saved = feeSavedId === row.id
+                const currentFee = barangayFeeAmount(row)
                 return (
                   <tr key={row.id} className="border-t border-line/50">
                     <td className="py-3 pr-4 font-semibold">{row.name}</td>
@@ -203,7 +223,7 @@ export function AdminBarangays() {
                         {saved ? <span className="text-xs text-teal-deep">Saved</span> : null}
                       </div>
                       <div className="mt-1 text-xs text-ink/45">
-                        Current: {formatPeso(row.deliveryFee?.fee ?? 0)}
+                        Current: {formatPeso(currentFee)}
                       </div>
                     </td>
                     <td className="py-3 pr-4">{row.is_active ? 'Yes' : 'No'}</td>

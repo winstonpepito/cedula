@@ -22,7 +22,7 @@ class BarangayController extends Controller
                 'id' => $b->id,
                 'name' => $b->name,
                 'code' => $b->code,
-                'delivery_fee' => $b->deliveryFee?->fee ?? 0,
+                'delivery_fee' => (float) ($b->deliveryFee?->fee ?? 0),
             ]);
 
         return response()->json(['data' => $barangays]);
@@ -30,9 +30,12 @@ class BarangayController extends Controller
 
     public function index()
     {
-        return response()->json([
-            'data' => Barangay::with('deliveryFee')->orderBy('name')->get(),
-        ]);
+        $barangays = Barangay::with('deliveryFee')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Barangay $b) => $this->adminPayload($b));
+
+        return response()->json(['data' => $barangays]);
     }
 
     public function store(Request $request)
@@ -56,7 +59,7 @@ class BarangayController extends Controller
             'is_active' => true,
         ]);
 
-        return response()->json(['data' => $barangay->load('deliveryFee')], 201);
+        return response()->json(['data' => $this->adminPayload($barangay->load('deliveryFee'))], 201);
     }
 
     public function update(Request $request, Barangay $barangay)
@@ -82,7 +85,9 @@ class BarangayController extends Controller
             $fee->save();
         }
 
-        return response()->json(['data' => $barangay->fresh('deliveryFee')]);
+        $barangay = $barangay->fresh('deliveryFee');
+
+        return response()->json(['data' => $this->adminPayload($barangay)]);
     }
 
     public function destroy(Barangay $barangay)
@@ -122,5 +127,22 @@ class BarangayController extends Controller
                 'default_barangay_id' => $settings->fresh()->default_barangay_id,
             ],
         ]);
+    }
+
+    private function adminPayload(Barangay $barangay): array
+    {
+        $fee = $barangay->deliveryFee;
+
+        return [
+            'id' => $barangay->id,
+            'name' => $barangay->name,
+            'code' => $barangay->code,
+            'is_active' => (bool) $barangay->is_active,
+            'delivery_fee' => (float) ($fee?->fee ?? 0),
+            'deliveryFee' => $fee ? [
+                'fee' => (float) $fee->fee,
+                'is_active' => (bool) $fee->is_active,
+            ] : null,
+        ];
     }
 }
