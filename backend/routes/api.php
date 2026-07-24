@@ -34,6 +34,7 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::put('/password', [AuthController::class, 'changePassword']);
 
     Route::prefix('admin')->group(function () {
         Route::get('/reports/dashboard', [ReportController::class, 'dashboard'])

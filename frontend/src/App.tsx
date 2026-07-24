@@ -7,6 +7,7 @@ import { MockPayPage } from './pages/MockPayPage'
 import { PayPage } from './pages/PayPage'
 import { ReceiptPage } from './pages/ReceiptPage'
 import { TokenReceiptPage, TrackPage } from './pages/TrackPage'
+import { AdminAccount } from './pages/admin/AdminAccount'
 import { AdminApplicationDetail, AdminApplications } from './pages/admin/AdminApplications'
 import { AdminBarangays } from './pages/admin/AdminBarangays'
 import { AdminDashboard } from './pages/admin/AdminDashboard'
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="homepage" element={<AdminLandingPage />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="account" element={<AdminAccount />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

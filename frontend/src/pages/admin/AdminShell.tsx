@@ -33,6 +33,7 @@ export function AdminShell() {
                   <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'text-teal' : ''}>Tax settings</NavLink>
                 </>
               ) : null}
+              <NavLink to="/admin/account" className={({ isActive }) => isActive ? 'text-teal' : ''}>Account</NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm">
